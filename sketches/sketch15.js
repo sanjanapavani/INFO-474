@@ -30,192 +30,162 @@ registerSketch('sk15', function(p) {
     "Snap":      [0,0,0,0,0,0,0,0,0,0,0,0.5,1.3,0,0,0,0,0,0,0],
     "Stripe":    [0,0,0,0,0,0,0,0,0,0,0,0,1.1,0,0,0,0,0,0,0],
   };
-  let selectedCompany=null, hoveredBar=null, animProgress=0, tooltipPt=null;
-  let barAnims=companies.map(()=>0);
-  let W,H,PAD,TL,BC;
-
-  function computeLayout(){
-    const el=p.canvas?p.canvas.parentElement:null;
-    W=(el?el.offsetWidth:900)||900;
-    H=Math.max(600,W*0.85);
-    PAD=Math.max(20,W*0.038);
-    const topH=H*0.20, panelY=topH+8, panelH=H*0.40;
-    TL={x:PAD,y:panelY,w:W*0.54-PAD,h:panelH};
-    BC={x:W*0.565,y:panelY,w:W*0.435-PAD,h:panelH};
-  }
+  let sel=null, anim=0;
+  let barA=companies.map(()=>0);
+  let tipPt=null;
+  const W=900, H=700, PAD=36;
+  const TL={x:PAD,y:160,w:480,h:300};
+  const BC={x:510,y:160,w:354,h:300};
 
   p.setup=function(){
-    computeLayout();
     p.createCanvas(W,H);
     p.textFont('monospace');
-    p.frameRate(60);
   };
-
-  p.windowResized=function(){computeLayout();p.resizeCanvas(W,H);};
 
   p.draw=function(){
-    animProgress=p.min(animProgress+0.016,1);
-    barAnims=barAnims.map((_,i)=>p.min(p.max(0,(animProgress-i*0.06)/0.7),1));
-    drawBg();drawHeader();tooltipPt=null;drawTimeline();drawBarChart();drawLegend();drawFooter();
-    if(tooltipPt)drawTooltip(tooltipPt);
-  };
-
-  function drawBg(){
+    anim=p.min(anim+0.018,1);
+    barA=barA.map((_,i)=>p.min(p.max(0,(anim-i*0.06)/0.7),1));
     p.background(13,13,13);
     p.stroke(22,22,22);p.strokeWeight(1);
-    const s=Math.max(28,W/34);
-    for(let x=0;x<W;x+=s)p.line(x,0,x,H);
-    for(let y=0;y<H;y+=s)p.line(0,y,W,y);
+    for(let x=0;x<W;x+=32)p.line(x,0,x,H);
+    for(let y=0;y<H;y+=32)p.line(0,y,W,y);
     p.noStroke();p.fill(210,38,38);p.rect(0,0,W,5);
-  }
+    drawHeader();tipPt=null;drawTimeline();drawBars();drawLegend();drawFooter();
+    if(tipPt)drawTip(tipPt);
+  };
 
   function drawHeader(){
-    const fs1=Math.max(24,W*0.048),fs2=Math.max(10,W*0.012),fs3=Math.max(9,W*0.010);
-    p.noStroke();p.fill(255);p.textSize(fs1);p.textAlign(p.LEFT,p.TOP);
-    p.text("The Great Tech",PAD,H*0.030);
-    p.fill(210,38,38);p.text("Correction",PAD,H*0.030+fs1*1.12);
-    p.fill(120,120,120);p.textSize(fs2);
-    p.text("500,000+ jobs lost  ·  2020–2024  ·  Source: layoffs.fyi",PAD,H*0.030+fs1*2.45);
-    p.fill(75,75,75);p.textSize(fs3);
+    p.noStroke();p.fill(255);p.textSize(42);p.textAlign(p.LEFT,p.TOP);
+    p.text("The Great Tech",PAD,28);
+    p.fill(210,38,38);p.text("Correction",PAD,76);
+    p.fill(110,110,110);p.textSize(12);
+    p.text("500,000+ jobs lost  2020-2024  Source: layoffs.fyi",PAD,130);
+    p.fill(70,70,70);p.textSize(10);
     p.text("LAYOFFS OVER TIME (thousands)",TL.x,TL.y-14);
-    p.text("TOP COMPANIES — click bar to filter",BC.x,BC.y-14);
-    p.stroke(35,35,35);p.strokeWeight(1);p.line(PAD,TL.y-3,W-PAD,TL.y-3);
+    p.text("TOP COMPANIES - click to filter",BC.x,BC.y-14);
+    p.stroke(35,35,35);p.strokeWeight(1);p.line(PAD,TL.y-4,W-PAD,TL.y-4);
   }
 
   function drawTimeline(){
-    const raw=selectedCompany
-      ?companyTimelines[selectedCompany].map((v,i)=>({month:timelineData[i].month,val:v}))
-      :timelineData;
-    const maxVal=Math.max(...raw.map(d=>d.val),1);
+    const raw=sel?companyTimelines[sel].map((v,i)=>({month:timelineData[i].month,val:v})):timelineData;
+    const mx=Math.max(...raw.map(d=>d.val),1);
     p.noStroke();p.fill(18,18,18);p.rect(TL.x,TL.y,TL.w,TL.h,3);
-    const iX=TL.x+TL.w*0.10,iW=TL.w*0.87,iY=TL.y+TL.h*0.07,iH=TL.h*0.78;
-    const fs=Math.max(8,W*0.009);
+    const iX=TL.x+48,iW=TL.w-60,iY=TL.y+16,iH=TL.h-40;
     for(let i=0;i<=4;i++){
       const yy=iY+iH-(i/4)*iH;
       p.stroke(32,32,32);p.strokeWeight(1);p.line(iX,yy,iX+iW,yy);
-      p.noStroke();p.fill(60,60,60);p.textSize(fs);p.textAlign(p.RIGHT);
-      p.text(selectedCompany?(i/4*maxVal).toFixed(1)+"k":Math.round(i/4*maxVal)+"k",iX-5,yy+4);
+      p.noStroke();p.fill(55,55,55);p.textSize(9);p.textAlign(p.RIGHT);
+      p.text(sel?(i/4*mx).toFixed(1)+"k":Math.round(i/4*mx)+"k",iX-4,yy+4);
     }
     const pts=raw.map((d,i)=>({
       x:iX+(i/(raw.length-1))*iW,
-      y:iY+iH-(d.val/maxVal)*iH*animProgress,
+      y:iY+iH-(d.val/mx)*iH*anim,
       val:d.val,month:d.month
     }));
-    p.noStroke();p.fill(210,38,38,22);
+    p.noStroke();p.fill(210,38,38,20);
     p.beginShape();p.vertex(pts[0].x,iY+iH);
     pts.forEach(pt=>p.vertex(pt.x,pt.y));
     p.vertex(pts[pts.length-1].x,iY+iH);p.endShape(p.CLOSE);
     for(let i=0;i<pts.length-1;i++){
-      const t=i/(pts.length-1);
-      p.stroke(p.lerp(140,255,t),p.lerp(30,55,t),35);p.strokeWeight(2);
+      p.stroke(p.lerp(140,255,i/(pts.length-1)),30,35);p.strokeWeight(2);
       p.line(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y);
     }
-    if(pts[12]&&animProgress>0.65){
-      const alpha=p.map(animProgress,0.65,1,0,255),pk=pts[12];
-      p.noStroke();p.fill(255,70,70,alpha);p.ellipse(pk.x,pk.y,11,11);
-      p.stroke(255,70,70,alpha*0.5);p.strokeWeight(1);p.line(pk.x+7,pk.y-7,pk.x+26,pk.y-26);
-      p.noStroke();p.fill(255,70,70,alpha);p.textSize(Math.max(10,W*0.011));p.textAlign(p.LEFT);
-      p.text("JAN '23 PEAK",pk.x+28,pk.y-28);
-      p.fill(110,110,110,alpha);p.textSize(Math.max(9,W*0.009));p.text("55k+ laid off",pk.x+28,pk.y-15);
+    if(pts[12]&&anim>0.65){
+      const al=p.map(anim,0.65,1,0,255),pk=pts[12];
+      p.noStroke();p.fill(255,70,70,al);p.ellipse(pk.x,pk.y,10,10);
+      p.stroke(255,70,70,al*0.5);p.strokeWeight(1);p.line(pk.x+6,pk.y-6,pk.x+22,pk.y-22);
+      p.noStroke();p.fill(255,70,70,al);p.textSize(10);p.textAlign(p.LEFT);
+      p.text("JAN '23 PEAK",pk.x+24,pk.y-24);
+      p.fill(100,100,100,al);p.textSize(9);p.text("55k+ laid off",pk.x+24,pk.y-12);
     }
     pts.forEach(pt=>{
-      const near=p.dist(p.mouseX,p.mouseY,pt.x,pt.y)<13;
+      const nr=p.dist(p.mouseX,p.mouseY,pt.x,pt.y)<12;
       p.noStroke();
-      if(near){p.fill(255,80,80);p.ellipse(pt.x,pt.y,12,12);tooltipPt=pt;}
-      else{p.fill(155,35,35);p.ellipse(pt.x,pt.y,5,5);}
+      if(nr){p.fill(255,80,80);p.ellipse(pt.x,pt.y,11,11);tipPt=pt;}
+      else{p.fill(140,30,30);p.ellipse(pt.x,pt.y,5,5);}
     });
-    p.noStroke();p.fill(60,60,60);p.textSize(fs);p.textAlign(p.CENTER);
+    p.noStroke();p.fill(55,55,55);p.textSize(9);p.textAlign(p.CENTER);
     ["2020","2021","2022","2023","2024"].forEach((yr,i)=>{
-      p.text(yr,iX+(i*4/(raw.length-1))*iW,iY+iH+16);
+      p.text(yr,iX+(i*4/(raw.length-1))*iW,iY+iH+14);
     });
-    if(selectedCompany){
-      p.noStroke();p.fill(210,38,38);p.textSize(Math.max(9,W*0.010));p.textAlign(p.LEFT);
-      p.text("↑ filtered: "+selectedCompany.toUpperCase()+"   (click again to reset)",TL.x+4,TL.y+TL.h-7);
-    }
+    if(sel){p.noStroke();p.fill(210,38,38);p.textSize(10);p.textAlign(p.LEFT);
+      p.text("filtered: "+sel+" (click again to reset)",TL.x+4,TL.y+TL.h-6);}
   }
 
-  function drawBarChart(){
-    const maxTotal=Math.max(...companies.map(c=>c.total));
+  function drawBars(){
+    const mx=Math.max(...companies.map(c=>c.total));
     p.noStroke();p.fill(18,18,18);p.rect(BC.x,BC.y,BC.w,BC.h,3);
-    const iX=BC.x+BC.w*0.30,iW=BC.w*0.52,gap=(BC.h-20)/companies.length,bH=Math.max(10,gap*0.60);
-    const fs=Math.max(9,W*0.011);
-    hoveredBar=null;
+    const iX=BC.x+BC.w*0.30,iW=BC.w*0.50,gap=(BC.h-16)/companies.length,bH=Math.max(10,gap*0.60);
     companies.forEach((co,i)=>{
-      const yy=BC.y+12+i*gap,barW=(co.total/maxTotal)*iW*barAnims[i];
-      const isSel=selectedCompany===co.name;
+      const yy=BC.y+10+i*gap,bw=(co.total/mx)*iW*barA[i];
+      const isSel=sel===co.name;
       const isHov=p.mouseX>=iX&&p.mouseX<=BC.x+BC.w&&p.mouseY>=yy&&p.mouseY<=yy+bH;
-      if(isHov)hoveredBar=i;
-      const bru=p.map(p.constrain(co.pct,0,100),0,100,0.22,1.0);
-      p.noStroke();p.fill(26,26,26);p.rect(iX,yy,iW,bH,2);
+      const br=p.map(p.constrain(co.pct,0,100),0,100,0.22,1.0);
+      p.noStroke();p.fill(24,24,24);p.rect(iX,yy,iW,bH,2);
       if(isSel)p.fill(255,255,255);
       else if(isHov)p.fill(255,100,55);
-      else p.fill(255*bru,38*bru*0.25,30*bru*0.2);
-      p.rect(iX,yy,barW,bH,2);
-      const na=isSel||isHov?255:145;
-      p.noStroke();p.fill(na,na,na);p.textSize(fs);p.textAlign(p.RIGHT);
-      p.text(co.name,iX-5,yy+bH-2);
-      p.fill(isSel?255:95,isSel?255:95,isSel?255:95);
-      p.textSize(Math.max(8,W*0.010));p.textAlign(p.LEFT);
-      p.text(co.total>=1000?(co.total/1000).toFixed(1)+"k":co.total,iX+barW+4,yy+bH-2);
+      else p.fill(255*br,38*br*0.25,30*br*0.2);
+      p.rect(iX,yy,bw,bH,2);
+      const na=isSel||isHov?255:140;
+      p.noStroke();p.fill(na,na,na);p.textSize(10);p.textAlign(p.RIGHT);
+      p.text(co.name,iX-4,yy+bH-2);
+      p.fill(isSel?255:90);p.textSize(9);p.textAlign(p.LEFT);
+      p.text(co.total>=1000?(co.total/1000).toFixed(1)+"k":co.total,iX+bw+3,yy+bH-2);
       if(co.pct>=15){
-        const bx=BC.x+BC.w-PAD*0.6-32;
-        p.fill(150,18,18,215);p.rect(bx,yy+1,32,bH-2,2);
-        p.fill(255,185,185);p.textSize(Math.max(8,W*0.009));p.textAlign(p.CENTER);
-        p.text(co.pct+"%",bx+16,yy+bH-2);
+        const bx=BC.x+BC.w-38;
+        p.fill(140,15,15,210);p.rect(bx,yy+1,30,bH-2,2);
+        p.fill(255,180,180);p.textSize(8);p.textAlign(p.CENTER);
+        p.text(co.pct+"%",bx+15,yy+bH-2);
       }
     });
-    p.cursor(hoveredBar!==null?'pointer':'default');
+    p.cursor(companies.some((_,i)=>{
+      const yy=BC.y+10+i*gap;
+      return p.mouseX>=iX&&p.mouseX<=BC.x+BC.w&&p.mouseY>=yy&&p.mouseY<=yy+(Math.max(10,gap*0.60));
+    })?'pointer':'default');
   }
 
   function drawLegend(){
-    const lx=TL.x,ly=TL.y+TL.h+Math.max(12,H*0.022),fs=Math.max(9,W*0.010);
-    p.noStroke();p.fill(65,65,65);p.textSize(fs);p.textAlign(p.LEFT);
+    const lx=PAD,ly=480,gw=200;
+    p.noStroke();p.fill(60,60,60);p.textSize(10);p.textAlign(p.LEFT);
     p.text("BAR DARKNESS = % OF WORKFORCE CUT",lx,ly);
-    const gw=Math.min(220,TL.w*0.46);
     for(let i=0;i<gw;i++){
-      const t=i/gw;
-      p.stroke(p.lerp(55,255,t),p.lerp(8,35,t*(1-t)*4),18);p.strokeWeight(1);
-      p.line(lx+i,ly+8,lx+i,ly+20);
+      const t=i/gw;p.stroke(p.lerp(50,255,t),p.lerp(8,30,t*(1-t)*4),15);
+      p.strokeWeight(1);p.line(lx+i,ly+8,lx+i,ly+18);
     }
-    p.noStroke();p.fill(55,55,55);p.textSize(fs-1);p.textAlign(p.LEFT);p.text("small %",lx,ly+32);
-    p.fill(210,38,38);p.textAlign(p.RIGHT);p.text("brutal cut",lx+gw,ly+32);
-    const stats=[{val:"~500k+",lbl:"TOTAL LAID OFF"},{val:"Jan 2023",lbl:"PEAK MONTH"},{val:"75%",lbl:"TWITTER/X WORKFORCE"}];
-    const startX=lx+gw+Math.max(20,W*0.03),colW=(W-PAD-startX)/3;
+    p.noStroke();p.fill(50,50,50);p.textSize(9);p.textAlign(p.LEFT);p.text("small %",lx,ly+30);
+    p.fill(210,38,38);p.textAlign(p.RIGHT);p.text("brutal",lx+gw,ly+30);
+    const stats=[{v:"~500k+",l:"TOTAL"},{v:"Jan 2023",l:"PEAK"},{v:"75%",l:"TWITTER/X"}];
     stats.forEach((s,i)=>{
-      const sx=startX+i*colW;
-      p.noStroke();p.fill(210,38,38);p.textSize(Math.max(16,W*0.020));p.textAlign(p.LEFT);
-      p.text(s.val,sx,ly+20);
-      p.fill(70,70,70);p.textSize(Math.max(8,W*0.009));p.text(s.lbl,sx,ly+34);
+      const sx=lx+gw+30+i*130;
+      p.noStroke();p.fill(210,38,38);p.textSize(18);p.textAlign(p.LEFT);p.text(s.v,sx,ly+18);
+      p.fill(65,65,65);p.textSize(9);p.text(s.l,sx,ly+30);
     });
   }
 
-  function drawTooltip(pt){
-    const tw=110,th=36;
-    let tx=pt.x+10,ty=pt.y-th-6;
-    if(tx+tw>W-PAD)tx=pt.x-tw-10;
-    if(ty<0)ty=pt.y+10;
-    p.noStroke();p.fill(12,12,12,230);p.rect(tx,ty,tw,th,3);
-    p.stroke(210,38,38,160);p.strokeWeight(1);p.rect(tx,ty,tw,th,3);
-    p.noStroke();p.fill(210,38,38);p.textSize(Math.max(9,W*0.010));p.textAlign(p.LEFT);
-    p.text(pt.month,tx+8,ty+14);
-    p.fill(200,200,200);p.text(pt.val.toFixed(1)+"k laid off",tx+8,ty+28);
+  function drawTip(pt){
+    let tx=pt.x+10,ty=pt.y-44;
+    if(tx+105>W)tx=pt.x-115;if(ty<0)ty=pt.y+8;
+    p.noStroke();p.fill(10,10,10,230);p.rect(tx,ty,105,34,3);
+    p.stroke(210,38,38,150);p.strokeWeight(1);p.rect(tx,ty,105,34,3);
+    p.noStroke();p.fill(210,38,38);p.textSize(10);p.textAlign(p.LEFT);
+    p.text(pt.month,tx+7,ty+13);
+    p.fill(190,190,190);p.text(pt.val.toFixed(1)+"k laid off",tx+7,ty+26);
   }
 
   function drawFooter(){
-    const fy=H-Math.max(18,H*0.030);
-    p.stroke(30,30,30);p.strokeWeight(1);p.line(PAD,fy-8,W-PAD,fy-8);
-    p.noStroke();p.fill(50,50,50);p.textSize(Math.max(8,W*0.009));
-    p.textAlign(p.LEFT);p.text("DATA: layoffs.fyi  ·  INFO 474 HWK 5  ·  WINTER 2026",PAD,fy+4);
-    p.textAlign(p.RIGHT);p.text("CLICK A BAR TO FILTER TIMELINE",W-PAD,fy+4);
+    p.stroke(28,28,28);p.strokeWeight(1);p.line(PAD,H-26,W-PAD,H-26);
+    p.noStroke();p.fill(45,45,45);p.textSize(9);
+    p.textAlign(p.LEFT);p.text("DATA: layoffs.fyi  INFO 474 HWK5  WINTER 2026",PAD,H-12);
+    p.textAlign(p.RIGHT);p.text("CLICK A BAR TO FILTER",W-PAD,H-12);
   }
 
   p.mouseClicked=function(){
-    const iX=BC.x+BC.w*0.30,gap=(BC.h-20)/companies.length,bH=Math.max(10,gap*0.60);
+    const gap=(BC.h-16)/companies.length,bH=Math.max(10,gap*0.60);
+    const iX=BC.x+BC.w*0.30;
     companies.forEach((co,i)=>{
-      const yy=BC.y+12+i*gap;
+      const yy=BC.y+10+i*gap;
       if(p.mouseX>=iX&&p.mouseX<=BC.x+BC.w&&p.mouseY>=yy&&p.mouseY<=yy+bH){
-        selectedCompany=(selectedCompany===co.name)?null:co.name;
-        animProgress=0.35;
+        sel=(sel===co.name)?null:co.name;anim=0.35;
       }
     });
   };
